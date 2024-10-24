@@ -23,7 +23,7 @@ pub fn set_config_name(buffer: []const u8, list: anytype) ![]u8 {
     return result;
 }
 
-pub fn read_config(package_name: [*:0]u8) !void {
+pub fn read_config(package_name: []const u8) !void {
     // Initiate allocator
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -32,9 +32,8 @@ pub fn read_config(package_name: [*:0]u8) !void {
     var list = ArrayList(u8).init(allocator);
     const list_ptr = &list;
     // Get DataBase path and config name
-    const package_name_slice: []const u8 = std.mem.span(package_name);
-    const db = try set_db_path(package_name_slice, list_ptr);
-    const config_name = try set_config_name(package_name_slice, list_ptr);
+    const db = try set_db_path(package_name, list_ptr);
+    const config_name = try set_config_name(package_name, list_ptr);
 
     // Move to db directory
     var db_dir = try fs.openDirAbsolute(db, .{});
