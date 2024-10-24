@@ -50,9 +50,16 @@ pub fn main() !void {
         }
     } else {
         // Default message
+        docs.print_ascii();
         std.debug.print(
-            \\grit: Cave Linux package manager
-            \\--------------------------------
+            \\
+            \\Grit: Speedy Cave Linux package manager
+            \\--------------------------------------
+            \\
+            \\Usage: grit [option] [flags] [package]
+            \\
+            \\Options:
+            \\
             \\i: Install a package
             \\u: Update a package
             \\q: Search for a package in repository
