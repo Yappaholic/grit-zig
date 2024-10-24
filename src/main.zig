@@ -1,10 +1,10 @@
 const std = @import("std");
 const file = @import("file.zig");
 const docs = @import("docs.zig");
-const fs = std.fs;
-var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = true }){};
 
 const Calls = enum { Install, Update, Query, Remove };
+
+// Return code based on invoke call
 pub fn generate_call_code(call: []const u8) Calls {
     const call_name = call[0];
     if (call_name == 'i') {
@@ -22,23 +22,34 @@ pub fn main() !void {
     const args = std.os.argv;
     if (args.len > 1) {
         const call: []const u8 = std.mem.span(args[1]);
-        std.debug.print("Call invoked {s}\n", .{call});
+        std.debug.print("Args used {s}\n", .{args[1..]});
         const call_code = generate_call_code(call);
+
+        // Switch states for different invoke calls
         switch (call_code) {
             Calls.Install => {
-                docs.install_docs();
+                if (args.len > 2) {
+                    try file.read_config(args[2]);
+                } else {
+                    docs.install_docs();
+                }
             },
             Calls.Update => {
                 docs.update_docs();
             },
             Calls.Query => {
-                docs.query_docs();
+                if (args.len > 2) {
+                    try file.read_config(args[2]);
+                } else {
+                    docs.query_docs();
+                }
             },
             Calls.Remove => {
                 docs.remove_docs();
             },
         }
     } else {
+        // Default message
         std.debug.print(
             \\grit: Cave Linux package manager
             \\--------------------------------
