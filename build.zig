@@ -15,9 +15,9 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSafe });
 
-    const exe = b.addExecutable(.{
+    const grit = b.addExecutable(.{
         .name = "grit",
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/grit/main.zig"),
         .target = target,
         .optimize = optimize,
         .strip = true,
@@ -25,36 +25,52 @@ pub fn build(b: *std.Build) void {
         .single_threaded = false,
     });
 
+    const grit_conf = b.addExecutable(.{
+      	.name = "grit-conf",
+      	.root_source_file = b.path("src/grit-conf/main.zig"),
+      	.target = target,
+      	.optimize = optimize,
+      	.strip = true,
+      	.use_llvm = true,
+      	.single_threaded = false,
+    });
+
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
-    b.installArtifact(exe);
+    b.installArtifact(grit);
+    b.installArtifact(grit_conf);
 
     // This *creates* a Run step in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
     // such a dependency.
-    const run_cmd = b.addRunArtifact(exe);
+    const grit_cmd = b.addRunArtifact(grit);
+    const grit_conf_cmd = b.addRunArtifact(grit_conf);
 
     // By making the run step depend on the install step, it will be run from the
     // installation directory rather than directly from within the cache directory.
     // This is not necessary, however, if the application depends on other installed
     // files, this ensures they will be present and in the expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
+    grit_cmd.step.dependOn(b.getInstallStep());
+    grit_conf_cmd.step.dependOn(b.getInstallStep());
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
     if (b.args) |args| {
-        run_cmd.addArgs(args);
+        grit_cmd.addArgs(args);
+        grit_conf_cmd.addArgs(args);
     }
 
     // This creates a build step. It will be visible in the `zig build --help` menu,
     // and can be selected like this: `zig build run`
     // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    const grit_step = b.step("grit", "Run package manager");
+    const grit_conf_step = b.step("grit-conf", "Check if conf file is valid");
+    grit_step.dependOn(&grit_cmd.step);
+    grit_conf_step.dependOn(&grit_conf_cmd.step);
 
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = b.path("src/grit/main.zig"),
         .target = target,
         .optimize = optimize,
     });
