@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/grit/main.zig"),
         .target = target,
         .optimize = optimize,
-        .strip = true,
+        .strip = false,
         .use_llvm = true,
         .single_threaded = false,
     });
@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) void {
       	.root_source_file = b.path("src/grit-conf/main.zig"),
       	.target = target,
       	.optimize = optimize,
-      	.strip = true,
+      	.strip = false,
       	.use_llvm = true,
       	.single_threaded = false,
     });

@@ -1,24 +1,20 @@
 const std = @import("std");
-const fifo = @import("fifo.zig");
+const stack = @import("stack.zig");
+const Queue = stack.Queue;
 const fs = std.fs;
 const ArrayList = std.ArrayList;
 
 const Config = struct {
-    Name: ?[]const u8,
-    Description: ?[]const u8,
-    Source: ?[]const u8,
-
-    pub fn check_config(self: *Config) bool {
-        if (self.Name != null and self.Description != null and self.Source != null){
-            return true;
-        } else return false;
-    }
+    Name: ?[]const u8 = null,
+    Description: ?[]const u8 = null,
+    Source: ?[]const u8 = null,
 };
 
 const BuildInputs = struct {
-  	Prepare: [][]const u8,
-  	Build: [][]const u8,
-  	Install: [][]const u8,
+  	Prepare: ?[]const u8,
+  	Build: ?[]const u8,
+  	Install: ?[]const u8,
+  	Specs: Config,
 };
 
 const ConfigError = error{
@@ -28,40 +24,44 @@ const ConfigError = error{
   MissingInput,
 };
 
-var config_specs = Config{.Name = null, .Description = null, .Source = null};
 // Get resulting strings
-var prepare = fifo.Queue([]const u8).init();
-var build = fifo.Queue([]const u8).init();
-var install = fifo.Queue([]const u8).init();
+var prepare = Queue([]const u8).init();
+var build = Queue([]const u8).init();
+var install = Queue([]const u8).init();
 //Get parentheses queues
-var prepare_q = fifo.Queue(u8).init();
-var build_q = fifo.Queue(u8).init();
-var install_q = fifo.Queue(u8).init();
+var prepare_q = Queue(u8).init();
+var build_q = Queue(u8).init();
+var install_q = Queue(u8).init();
+var result = BuildInputs{
+	.Prepare = null,
+	.Build = null,
+	.Install = null,
+	.Specs = Config{},
+};
 
-
-pub fn check_config_specs(config_line: []const u8) !void {
-    // Get package Name
-    if (std.mem.startsWith( u8, config_line, "NAME")) {
-      var iter = std.mem.splitAny(u8, config_line, "\"");
-      _ = iter.next();
-      if (config_specs.Name == null) {
-        config_specs.Name = iter.next();
-      } else return error.RepeatingValues;
-    // Get package Description
-    } else if (std.mem.startsWith( u8, config_line, "DESCRIPTION")) {
-      var iter = std.mem.splitAny(u8, config_line, "\"");
-      _ = iter.next();
-      if (config_specs.Description == null) {
-        config_specs.Description = iter.next();
-      } else return error.RepeatingValues;
-    // Get package Source
-    } else if (std.mem.startsWith( u8, config_line, "SRC")) {
-      var iter = std.mem.splitAny(u8, config_line, "\"");
-      _ = iter.next();
-      if (config_specs.Source == null) {
-        config_specs.Source = iter.next();
-      } else return error.RepeatingValues;
+pub fn strip(string: []const u8, config_name: []const u8) ![]const u8 {
+    const pa = std.heap.page_allocator;
+    var new_string = ArrayList(u8).init(pa);
+    var i = config_name.len + 1;
+    while (i < string.len): (i += 1) {
+        if (string[i] != '"') {
+            try new_string.append(string[i]);
+        }
     }
+    return try new_string.toOwnedSlice();
+}
+pub fn check_config_specs(config_line: []const u8, config: *Config) !void {
+    // Get package Name
+    if (std.mem.startsWith( u8, config_line, "NAME") == true and config.Name == null) {
+        result.Specs.Name = try strip(config_line, "NAME");
+    // Get package Description
+  	} else if (std.mem.startsWith( u8, config_line, "DESCRIPTION") == true and config.Description == null) {
+          result.Specs.Description = try strip(config_line, "DESCRIPTION");
+    // Get package Source
+    } else if (std.mem.startsWith( u8, config_line, "SRC") == true and config.Source == null) {
+        result.Specs.Source = try strip(config_line, "SRC");
+  	}
+    
 }
 
 pub fn build_input_function(config_line: []const u8, queue: []const u8) !void{
@@ -70,8 +70,8 @@ pub fn build_input_function(config_line: []const u8, queue: []const u8) !void{
     const closed = '}';
 
     // Pointers to original queues
-    var input_ptr: *fifo.Queue([]const u8)  = undefined;
-    var queue_ptr: *fifo.Queue(u8)  = undefined;
+    var input_ptr: *Queue([]const u8)  = undefined;
+    var queue_ptr: *Queue(u8)  = undefined;
 
     // Set queues to work with
     if (std.mem.eql(u8, queue, "prepare")) {
@@ -136,13 +136,16 @@ pub fn test_inputs() !void {
     	or install_q.empty() == false) {
         return error.BadFormat;
     }
+
     const eql = std.mem.eql;
+    // If returned input is empty, return MissingInput error
     if (eql(u8,try prepare.concat_result(), "")) {
         return error.MissingInput;
     }
 }
+
 // Read package config
-pub fn read_config(config_path: []const u8) !void {
+pub fn read_config(config_path: []const u8) !BuildInputs {
     // Initiate allocator
     var gp = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gp.allocator();
@@ -159,7 +162,7 @@ pub fn read_config(config_path: []const u8) !void {
     const config_buffer = try config.readToEndAlloc(allocator, 500);
     defer allocator.free(config_buffer);
 
-    // Print config text
+    // Split config text into lines
     var iter = std.mem.splitAny(u8, config_buffer, "\n");
     const stdout = std.io.getStdOut();
     defer stdout.close();
@@ -167,36 +170,19 @@ pub fn read_config(config_path: []const u8) !void {
     // Generate config and print text
     while (iter.next()) |line| {
       const trimmed_line = std.mem.trim(u8, line, " ");
-      check_config_specs(trimmed_line) catch |err| {
+      check_config_specs(trimmed_line, &result.Specs) catch |err| {
         if (err == error.RepeatingValues) {
           std.debug.print("{}: there are repeating values in the config\n", .{error.RepeatingValues});
-          return;
+          break;
         }
       };
-      try check_config_inputs(line);
+      try check_config_inputs(trimmed_line);
     }
 
     test_inputs() catch |err| return err;
-
-    // Generate final input strings
-    const prepare_config = try prepare.concat_result();
-    const build_config = try build.concat_result();
-    const install_config = try install.concat_result();
-
-    std.debug.print(
-        \\Prepare steps:
-        \\{s}
-        \\Build steps:
-        \\{s}
-        \\Install steps:
-        \\{s}
-        \\
-    , .{prepare_config, build_config, install_config});
-    // try stdout.writer().print(
-    // \\ Name: {s}
-    // \\ Description: {s}
-    // \\ Source: {s}
-    // \\
-    // , .{config_specs.Name.?, config_specs.Description.?, config_specs.Source.?});
-
+    // Config
+    result.Prepare = try prepare.concat_result();
+    result.Build = try build.concat_result();
+    result.Install = try install.concat_result();
+    return result;
 }

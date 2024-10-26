@@ -62,6 +62,7 @@ pub fn Queue(comptime T: type) type{
         pub fn concat_result(self: Self) !T {
             const allocator = std.heap.page_allocator;
             var array = std.ArrayList(u8).init(allocator);
+            try array.appendSlice("function ");
             for (self.stack) |item| {
                 if (item != null) {
                     try array.appendSlice(item.?);
