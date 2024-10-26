@@ -29,7 +29,7 @@ pub fn main() !void {
         switch (call_code) {
             Calls.Install => {
                 if (args.len > 2) {
-                    try file.read_config(args[2]);
+                    file.read_config(args[2]) catch |err| std.debug.print("{}\n", .{err});
                 } else {
                     docs.install_docs();
                 }

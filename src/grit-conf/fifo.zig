@@ -4,51 +4,73 @@ pub const QueueError = error{
     EmptyQueue,
 };
 
-pub const QueueSet = struct {
-    queue: Queue,
-    stack: ?[10]?[]const u8,
-};
+pub fn Queue(comptime T: type) type{
+	return struct {
+        stack: [20]?T,
+        head: ?T,
+        current: ?T,
+        count: ?usize,
 
-pub const Queue = struct {
-    stack: ?[10]?[]const u8,
-    head: ?[]const u8,
-    current: ?[]const u8,
-    count: ?usize,
+ 		const Self = @This();
 
-    // Initialize the queue with stack array
-    pub fn init(self: *Queue, stack: ?[10]?[]const u8) void{
-        self.stack = stack;
-        self.count = 0;
-    }
-
-    pub fn push(self: *Queue, item: []const u8) void {
-        const index = self.count.?;
-        self.stack.?[index] = item;
-        self.current = self.stack.?[index];
-        self.count.? += 1;
-        if (self.count.? == 1) {
-            self.head = self.current.?;
+        pub fn init() Self {
+            return .{
+                .stack = undefined,
+                .head = null,
+                .current = null,
+                .count = 0,
+            };
         }
-    }
 
-    pub fn pop(self: *Queue) !void {
-        if (self.count.? == 0 ) {
-            return error.EmptyQueue;
+        pub fn push(self: *Self, item: T) void {
+            const index = self.count.?;
+            self.stack[index] = item;
+            self.current = self.stack[index];
+            self.count.? += 1;
+            if (self.count.? == 1) {
+                self.head = self.current.?;
+            }
         }
-        self.count.? -= 1;
-        const index = self.count.?;
-        self.stack.?[index] = null;
-        if (self.count.? == 0) {
-            self.head = null;
-            self.current = null;
-        } else {
-            self.current = self.stack.?[index];
-        }
-    }
-};
 
-pub fn create_queue(stack: [10]?[]const u8) Queue{
-    var q = Queue{.stack = null, .head = null, .current = null, .count = null};
-    q.init(stack);
-    return q;
+        pub fn pop(self: *Self) !void {
+            if (self.count.? == 0 ) {
+                return error.EmptyQueue;
+            }
+            self.count.? -= 1;
+            const index = self.count.?;
+            self.stack[index] = null;
+            if (self.count.? == 0) {
+                self.head = null;
+                self.current = null;
+            } else {
+                self.current = self.stack[index];
+            }
+        }
+
+        pub fn empty(self: Self) bool {
+            if (self.stack[0] == null) {
+                return true;
+            } else return false;
+        }
+
+        pub fn opened(self: Self) bool {
+            if (self.stack[0] == null or self.stack[0] != null) {
+                return true;
+            } else return false;
+        }
+
+        pub fn concat_result(self: Self) !T {
+            const allocator = std.heap.page_allocator;
+            var array = std.ArrayList(u8).init(allocator);
+            for (self.stack) |item| {
+                if (item != null) {
+                    try array.appendSlice(item.?);
+                    try array.appendSlice("\n");
+                }
+            }
+            const result = array.toOwnedSlice();
+            return result;
+        }
+	};
 }
+

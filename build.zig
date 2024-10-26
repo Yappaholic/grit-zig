@@ -65,7 +65,7 @@ pub fn build(b: *std.Build) void {
     // and can be selected like this: `zig build run`
     // This will evaluate the `run` step rather than the default, which is "install".
     const grit_step = b.step("grit", "Run package manager");
-    const grit_conf_step = b.step("grit-conf", "Check if conf file is valid");
+    const grit_conf_step = b.step("grit-conf", "Run config validation tool");
     grit_step.dependOn(&grit_cmd.step);
     grit_conf_step.dependOn(&grit_conf_cmd.step);
 
